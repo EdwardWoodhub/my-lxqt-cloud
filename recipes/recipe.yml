@@ -69,7 +69,7 @@ modules:
       - lxqt-qtplugin
       - lxqt-runner
       - lxqt-session
-      - lxqt-lockscreen
+      #- lxqt-lockscreen
       - pcmanfm-qt
       - qterminal
       - labwc
