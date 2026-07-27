@@ -135,7 +135,7 @@ modules:
   # 4. 动态用户服务 (WayVNC 与 Syncthing)
   # ------------------------------------------------------------
   - type: script
-  snippets:
+    snippets:
     - |
       cat <<EOF > /etc/systemd/system/vnc-limit.service
       [Unit]
