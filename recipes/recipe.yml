@@ -48,7 +48,7 @@ modules:
       - xorg-x11-drv-vmware
       - mesa-dri-drivers
       - xorg-x11-server-Xwayland
-      - open-vm-tools-desktop
+      #- open-vm-tools-desktop
       - sddm
       #- lightdm
       #- lightdm-gtk
@@ -69,6 +69,7 @@ modules:
       - lxqt-qtplugin
       - lxqt-runner
       - lxqt-session
+      - lxqt-lockscreen
       - pcmanfm-qt
       - qterminal
       - labwc
@@ -89,7 +90,7 @@ modules:
       - engrampa
       - galculator
       # --- 生产力与同步 ---
-      - syncthing
+      #- syncthing
       - wayvnc
       - v2raya
       - firewalld
@@ -118,17 +119,17 @@ modules:
       # - loginctl enable-linger edward  <-- 删掉这一行
 
       - firewall-offline-cmd --add-port=5900/tcp
-      - firewall-offline-cmd --add-port=8384/tcp
+      #- firewall-offline-cmd --add-port=8384/tcp
       
-      - |
-        mkdir -p /etc/sddm.conf.d
-        cat <<EOF > /etc/sddm.conf.d/autologin.conf
-        [Autologin]
-        User=edward
-        Session=lxqt-wayland
-        [General]
-        DisplayServer=wayland
-        EOF
+      #- |
+        #mkdir -p /etc/sddm.conf.d
+        #cat <<EOF > /etc/sddm.conf.d/autologin.conf
+        #[Autologin]
+        #User=edward
+        #Session=lxqt-wayland
+        #[General]
+        #DisplayServer=wayland
+        #EOF
 
   # ------------------------------------------------------------
   # 4. 动态用户服务 (WayVNC 与 Syncthing)
@@ -158,21 +159,21 @@ modules:
         EOF
 
         # --- Syncthing 8384 版 ---
-        cat <<EOF > /usr/lib/systemd/user/syncthing.service
-        [Unit]
-        Description=Syncthing Service
-        After=network.target
+        #cat <<EOF > /usr/lib/systemd/user/syncthing.service
+        #[Unit]
+        #Description=Syncthing Service
+        #After=network.target
 
-        [Service]
-        Environment=HOME=%h
-        ExecStartPre=/usr/bin/mkdir -p %h/.config/syncthing
-        ExecStart=/usr/bin/syncthing serve --no-browser --no-restart --gui-address=127.0.0.1:8384
-        Restart=on-failure
-        RestartSec=10
+        #[Service]
+        #Environment=HOME=%h
+        #ExecStartPre=/usr/bin/mkdir -p %h/.config/syncthing
+        #ExecStart=/usr/bin/syncthing serve --no-browser --no-restart --gui-address=127.0.0.1:8384
+        #Restart=on-failure
+        #RestartSec=10
 
-        [Install]
-        WantedBy=default.target
-        EOF
+        #[Install]
+        #WantedBy=default.target
+        #EOF
 
   # ------------------------------------------------------------
   # 5. 激活服务
@@ -209,11 +210,11 @@ modules:
         #- lightdm.service
         - sddm.service
         - v2raya.service
-        - vmtoolsd.service
+        #- vmtoolsd.service
         - firewalld.service
     user:
       enabled:
         - wayvnc.service
-        - syncthing.service
+        #- syncthing.service
         
 
