@@ -150,7 +150,7 @@ modules:
         Environment=XDG_RUNTIME_DIR=%t
         # 使用 systemctl 原生命令，不再依赖外部二进制
         ExecStartPre=/usr/bin/systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR
-        ExecStart=/usr/bin/wayvnc --render-cursor 0.0.0.0 5900
+        ExecStart=/usr/bin/wayvnc --render-cursor --max-clients=1 0.0.0.0 5900
         Restart=always
         RestartSec=10
 
