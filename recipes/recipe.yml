@@ -135,6 +135,23 @@ modules:
   # 4. 动态用户服务 (WayVNC 与 Syncthing)
   # ------------------------------------------------------------
   - type: script
+  snippets:
+    - |
+      cat <<EOF > /etc/systemd/system/vnc-limit.service
+      [Unit]
+      Description=Limit VNC concurrent connections
+      After=firewalld.service network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/sbin/iptables -I INPUT -p tcp --dport 5900 -m connlimit --connlimit-above 1 -j REJECT
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+  
+  - type: script
     snippets:
       - |
         mkdir -p /usr/lib/systemd/user/
@@ -150,7 +167,7 @@ modules:
         Environment=XDG_RUNTIME_DIR=%t
         # 使用 systemctl 原生命令，不再依赖外部二进制
         ExecStartPre=/usr/bin/systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR
-        ExecStart=/usr/bin/wayvnc --render-cursor --max-clients=1 0.0.0.0 5900
+        ExecStart=/usr/bin/wayvnc --render-cursor 0.0.0.0 5900
         Restart=always
         RestartSec=10
 
@@ -215,6 +232,7 @@ modules:
     user:
       enabled:
         - wayvnc.service
+        - vnc-limit.service
         #- syncthing.service
         
 
