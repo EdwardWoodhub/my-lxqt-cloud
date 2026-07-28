@@ -1,4 +1,4 @@
-# Install Fedoar CoreOS on VPS
+# Install Fedora CoreOS on VPS
 
 ```
 # 使用上传完毕的fedora-coreos-44.20260621.3.1-openstack.x86_64.qcow2，安装失败
@@ -16,7 +16,7 @@ sudo rpm-ostree rebase ostree-unverified-registry:ghcr.io/ublue-os/ucore:stable
 # Rebase to my LXQt blue-build-image
 
 ```
-# 从Fedoar CoreOS直接rebase到自定义镜像，出错
+# 从Fedora CoreOS直接rebase到自定义镜像，出错
 sudo rpm-ostree rebase ostree-unverified-registry:ghcr.io/edwardwoodhub/my-lxqt-qcow2:latest
 ```
 
