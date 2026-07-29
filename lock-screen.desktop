@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=一键锁屏
+Name[en]=Lock Screen
+Comment=立即锁定屏幕
+Exec=swaylock -f --indicator-idle-visible --color 1a1a1a --ring-color 7f7f7f --key-hl-color 00ff00 --text-color ffffff
+Icon=system-lock-screen
+Terminal=false
+Categories=System;Security;
