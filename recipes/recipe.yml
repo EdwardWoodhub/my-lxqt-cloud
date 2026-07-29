@@ -69,7 +69,7 @@ modules:
       - lxqt-qtplugin
       - lxqt-runner
       - lxqt-session
-      - swaylock-effects
+      #- swaylock-effects # does not exist
       #- lxqt-lockscreen
       - pcmanfm-qt
       - qterminal
