@@ -86,6 +86,7 @@ modules:
       # --- 换装更稳的文件管理器 ---
       - thunar
       - thunar-archive-plugin
+      - tilix
       - pluma                     # 文本编辑器备胎
       - atril
       - engrampa
