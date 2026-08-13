@@ -2,7 +2,7 @@ name: bluebuild
 on:
   schedule:
     - cron:
-        "38 20 * * *" # build at 04:38 CST every day
+        "32 20 * * *" # build at 04:32 CST every day
         # (20 minutes after last ublue images start building)
   push:
     paths-ignore: # don't rebuild if only documentation has changed
@@ -31,7 +31,7 @@ jobs:
     steps:
       # the build is fully handled by the reusable github action
       - name: Build Custom Image
-        uses: blue-build/github-action@v1.10
+        uses: blue-build/github-action@v1.12
         with:
           recipe: ${{ matrix.recipe }}
           cosign_private_key: ${{ secrets.SIGNING_SECRET }} # 这里的钥匙现在你有啦！
