@@ -41,6 +41,7 @@ modules:
         - io.missioncenter.MissionCenter # 如果你反悔了，想把 Mission Center 加回来
         - com.jianguoyun.Nutstore
         - com.dropbox.Client
+        - io.github.peazip.PeaZip
   
 
   - type: rpm-ostree
