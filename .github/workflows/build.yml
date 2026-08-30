@@ -141,7 +141,7 @@ jobs:
 
       # 4. 将生成的 qcow2 文件上传到 GitHub 运行结果的 Artifacts 中
       - name: Upload QCOW2 as Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: my-lxqt-qcow2
           path: ./output/qcow2/disk.qcow2
