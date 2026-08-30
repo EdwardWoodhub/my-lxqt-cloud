@@ -95,7 +95,7 @@ jobs:
 
       # 1. 登录 GHCR 以获得拉取私有/公开自定义镜像的权限
       - name: Log in to GHCR
-        uses: redhat-actions/podman-login@v1
+        uses: redhat-actions/podman-login@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
