@@ -91,7 +91,7 @@ jobs:
 
       # 2. 检出代码以读取必要信息
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 1. 登录 GHCR 以获得拉取私有/公开自定义镜像的权限
       - name: Log in to GHCR
