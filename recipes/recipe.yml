@@ -95,9 +95,15 @@ modules:
       - lxqt-labwc-session
       - adwaita-cursor-theme
       - screengrab
+      - grim
+      - slurp
+      - lximage-qt
+      - flameshot
+      - spectacle
       # --- 修复工具补丁 ---
       - dbus-x11                  # 提供 dbus-update-activation-environment (备用)
       - xdg-desktop-portal-gtk    # 修复窗口弹出
+      - xdg-desktop-portal-wlr
       - xdg-user-dirs
       - xdg-desktop-portal
       # --- 换装更稳的文件管理器 ---
