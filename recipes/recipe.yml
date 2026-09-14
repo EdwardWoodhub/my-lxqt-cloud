@@ -101,6 +101,7 @@ modules:
       - lxqt-wayland-session
       - lxqt-labwc-session
       #- lxqt-lockscreen
+      - meld
       - mesa-dri-drivers
       #- open-vm-tools-desktop
       - polkit
