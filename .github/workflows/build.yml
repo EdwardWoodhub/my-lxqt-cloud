@@ -71,6 +71,7 @@ jobs:
           # 3. 执行跨仓库同步传输
           echo "Syncing image layers..."
           regctl image copy \
+            --verbosity info \
             ghcr.io/edwardwoodhub/my-lxqt-cloud:latest \
             ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
       
