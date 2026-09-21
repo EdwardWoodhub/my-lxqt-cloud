@@ -52,20 +52,28 @@ jobs:
           username: ${{ secrets.ALIYUN_ACR_USERNAME }}
           password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
 
+# =========================================================================
+      # 【修改后步骤 2】：使用 regctl 稳健流式同步（替代容易断流卡死的 skopeo）
       # =========================================================================
-      # 【修改后步骤 2】：直接推送本地已经构建好的镜像至阿里云（零下载，不走 GHCR 外网）
-      # =========================================================================
-      - name: Push Local Image directly to Aliyun ACR
+      - name: Sync Image to Aliyun ACR using regctl
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         run: |
-          echo "Listing local images to verify:"
-          sudo podman images
+          # 1. 下载并安装 regctl
+          echo "Installing regctl..."
+          curl -sSLo /usr/local/bin/regctl https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64
+          chmod +x /usr/local/bin/regctl
 
-          echo "Tagging local image for Aliyun ACR..."
-          sudo podman tag ghcr.io/edwardwoodhub/my-lxqt-cloud:latest ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+          # 2. 分别登录 GHCR 和 阿里云 ACR
+          echo "Logging into registries..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | regctl registry login ghcr.io -u "${{ github.actor }}" --pass-stdin
+          echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | regctl registry login "${{ secrets.ALIYUN_ACR_REGISTRY }}" -u "${{ secrets.ALIYUN_ACR_USERNAME }}" --pass-stdin
 
-          echo "Pushing directly from local storage to Aliyun ACR..."
-          sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+          # 3. 执行跨仓库同步传输
+          echo "Syncing image layers..."
+          regctl image copy \
+            ghcr.io/edwardwoodhub/my-lxqt-cloud:latest \
+            ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+      
 
             
 # ==========================================
