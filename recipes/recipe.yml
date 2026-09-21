@@ -74,9 +74,11 @@ modules:
       - dbus-x11                  # 提供 dbus-update-activation-environment (备用)
       - engrampa
       - fastfetch
+      - featherpad
       - flameshot
       - firewalld
       - galculator
+      - gedit
       - git
       - gnome-terminal
       - grim
@@ -106,7 +108,7 @@ modules:
       #- open-vm-tools-desktop
       - polkit
       - pcmanfm-qt
-      - pluma                     # 文本编辑器 (备用)
+      - pluma                     # 文本编辑器 (备用)(在lxqt上图标显示异常)
       - qterminal
       - screengrab
       - sddm
