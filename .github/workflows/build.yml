@@ -60,10 +60,10 @@ jobs:
         run: |
           echo "Syncing latest image layers to Aliyun ACR in compatibility mode..."
           skopeo copy \
+            --retry-times 10 \
+            --max-concurrent-transfers 1 \
             --src-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
             --dest-creds "${{ secrets.ALIYUN_ACR_USERNAME }}:${{ secrets.ALIYUN_ACR_PASSWORD }}" \
-            --dest-compress-format gzip \
-            --format v2s2 \
             docker://ghcr.io/edwardwoodhub/my-lxqt-cloud:latest \
             docker://${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
             
