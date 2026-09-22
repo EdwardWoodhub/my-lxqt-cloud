@@ -18,21 +18,21 @@ modules:
         # 直接让整个底座版本与当前仓库对齐
         # rpm-ostree upgrade
         
-  - type: script
-    snippets:
-      - |
-        cat << 'EOF' > /etc/yum.repos.d/_copr_zhullyb-v2rayA.repo
-        [copr:copr.fedorainfracloud.org:zhullyb:v2rayA]
-        name=Copr repo for v2rayA owned by zhullyb
-        baseurl=https://download.copr.fedorainfracloud.org/results/zhullyb/v2rayA/fedora-44-$basearch/
-        type=rpm-md
-        skip_if_unavailable=True
-        gpgcheck=1
-        gpgkey=https://download.copr.fedorainfracloud.org/results/zhullyb/v2rayA/pubkey.gpg
-        repo_gpgcheck=0
-        enabled=1
-        enabled_metadata=1
-        EOF
+  #- type: script
+    #snippets:
+      #- |
+        #cat << 'EOF' > /etc/yum.repos.d/_copr_zhullyb-v2rayA.repo
+        #[copr:copr.fedorainfracloud.org:zhullyb:v2rayA]
+        #name=Copr repo for v2rayA owned by zhullyb
+        #baseurl=https://download.copr.fedorainfracloud.org/results/zhullyb/v2rayA/fedora-44-$basearch/
+        #type=rpm-md
+        #skip_if_unavailable=True
+        #gpgcheck=1
+        #gpgkey=https://download.copr.fedorainfracloud.org/results/zhullyb/v2rayA/pubkey.gpg
+        #repo_gpgcheck=0
+        #enabled=1
+        #enabled_metadata=1
+        #EOF
         
  # - type: script
   #  snippets:
@@ -119,7 +119,7 @@ modules:
       - thunar
       - thunar-archive-plugin
       - tilix
-      - v2raya
+      #- v2raya
       - wayvnc
       - xdg-desktop-portal-gtk    # 修复窗口弹出
       - xdg-desktop-portal-wlr
@@ -258,7 +258,7 @@ modules:
       enabled:
         #- lightdm.service
         - sddm.service
-        - v2raya.service
+        #- v2raya.service
         #- vmtoolsd.service
         - firewalld.service
         - vnc-limit.service
