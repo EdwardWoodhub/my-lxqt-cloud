@@ -93,7 +93,7 @@ jobs:
 
       # 2. 检出代码以读取必要信息
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 3. 登录 GHCR
       - name: Log in to GHCR
