@@ -50,7 +50,7 @@ jobs:
           podman login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
           podman login ${{ secrets.ALIYUN_ACR_REGISTRY }} -u ${{ secrets.ALIYUN_ACR_USERNAME }} -p ${{ secrets.ALIYUN_ACR_PASSWORD }}
 
-      # 3. 使用官方容器镜像执行构建（显式连接 Podman socket）
+      # 3. 使用官方容器镜像执行构建（显式连接 Podman socket 并指定 build-driver）
       - name: Build and Push Locally
         run: |
           # 启动宿主机的 podman socket 服务
@@ -65,7 +65,7 @@ jobs:
               -w /workspace \
               --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
-              build --builder podman recipes/${{ matrix.recipe }}
+              build --build-driver podman recipes/${{ matrix.recipe }}
           else
             echo "Building image and pushing directly to GHCR and Aliyun ACR..."
             
@@ -78,7 +78,7 @@ jobs:
               -w /workspace \
               --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
-              build --builder podman recipes/${{ matrix.recipe }}
+              build --build-driver podman recipes/${{ matrix.recipe }}
 
             # 直接从本地 Podman 存储打 Tag 并推往阿里云 ACR
             echo "Tagging and pushing directly to Aliyun ACR (Zero download)..."
@@ -86,6 +86,7 @@ jobs:
             sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
           fi
           
+         
       
       
 
