@@ -60,6 +60,7 @@ jobs:
               -v /var/lib/containers/storage:/var/lib/containers/storage \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace \
+              --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
               build ./config/${{ matrix.recipe }}
           else
@@ -72,6 +73,7 @@ jobs:
               -v /run/user/1001/containers/auth.json:/root/.config/containers/auth.json:ro \
               -e COSIGN_PRIVATE_KEY="${{ secrets.SIGNING_SECRET }}" \
               -w /workspace \
+              --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
               build ./config/${{ matrix.recipe }}
 
@@ -80,6 +82,9 @@ jobs:
             sudo podman tag ghcr.io/edwardwoodhub/my-lxqt-cloud:latest ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
             sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
           fi
+
+          
+      
           
       
 
