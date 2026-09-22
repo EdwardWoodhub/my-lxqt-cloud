@@ -135,7 +135,7 @@ jobs:
 
       # 6. 上传 Artifact
       - name: Upload QCOW2 as Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: my-lxqt-qcow2
           path: ./output/qcow2/disk.qcow2
