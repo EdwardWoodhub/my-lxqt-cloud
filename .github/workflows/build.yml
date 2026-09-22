@@ -29,68 +29,60 @@ jobs:
           # !! Add your recipes here
           - recipe.yml
     steps:
-      # the build is fully handled by the reusable github action
-      - name: Build Custom Image
-        uses: blue-build/github-action@v1.12
-        with:
-          recipe: ${{ matrix.recipe }}
-          cosign_private_key: ${{ secrets.SIGNING_SECRET }} # 这里的钥匙现在你有啦！
-          registry_token: ${{ github.token }}
-          pr_event_number: ${{ github.event.number }}
+      - name: Checkout Repo
+        uses: actions/checkout@v4
 
-          # enabled by default, disable if your image is small and you want faster builds
-          maximize_build_space: true
+      # 1. 释放空间（原先在 bluebuild Action 内部，现在提到最前面）
+      - name: Maximize Build Space
+        uses: ublue-os/remove-unneeded-software@v0.1
 
-# =========================================================================
-      # 【修改后步骤 1】：登录阿里云 ACR
-      # =========================================================================
-      - name: Log in to Aliyun ACR
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-        uses: redhat-actions/podman-login@v1
-        with:
-          registry: ${{ secrets.ALIYUN_ACR_REGISTRY }}
-          username: ${{ secrets.ALIYUN_ACR_USERNAME }}
-          password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
-
-# =========================================================================
-      # 【修改后步骤 2】：使用 regctl 稳健流式同步（替代容易断流卡死的 skopeo）
-      # =========================================================================
-      - name: Sync Image to Aliyun ACR using regctl
+      # 2. 一次性登录 GHCR 和 阿里云 ACR（凭据写入同一个 Podman/Docker 认证池）
+      - name: Log in to Registries (GHCR & Aliyun ACR)
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         run: |
-          # 1. 下载并安装 regctl
-          echo "Installing regctl..."
-          curl -sSLo /usr/local/bin/regctl https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64
-          chmod +x /usr/local/bin/regctl
+          podman login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+          podman login ${{ secrets.ALIYUN_ACR_REGISTRY }} -u ${{ secrets.ALIYUN_ACR_USERNAME }} -p ${{ secrets.ALIYUN_ACR_PASSWORD }}
 
-          # 2. 分别登录 GHCR 和 阿里云 ACR
-          echo "Logging into registries..."
-          echo "${{ secrets.GITHUB_TOKEN }}" | regctl registry login ghcr.io -u "${{ github.actor }}" --pass-stdin
-          echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | regctl registry login "${{ secrets.ALIYUN_ACR_REGISTRY }}" -u "${{ secrets.ALIYUN_ACR_USERNAME }}" --pass-stdin
+      # 3. 安装官方 BlueBuild CLI 并构建（构建结果直接沉淀在当前 Runner 本地）
+      - name: Build and Push Locally
+        run: |
+          # 下载官方 bluebuild cli
+          curl -sSLo /tmp/bluebuild.tar.gz https://github.com/blue-build/cli/releases/latest/download/bluebuild-linux-x86_64.tar.gz
+          tar -xzf /tmp/bluebuild.tar.gz -C /usr/local/bin
+          chmod +x /usr/local/bin/bluebuild
 
-          # 3. 执行跨仓库同步传输
-          echo "Syncing image layers..."
-          regctl image copy \
-            --verbosity info \
-            ghcr.io/edwardwoodhub/my-lxqt-cloud:latest \
-            ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
-      
-
+          # 仅在非 main 分支/PR 时只构建不推送，避免污染镜像
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Running PR build (no push)..."
+            bluebuild build ./config/${{ matrix.recipe }}
+          else
+            echo "Building image and pushing directly to GHCR and Aliyun ACR..."
             
+            # 使用 cosign 密钥生成签名（若配置了签名密钥）
+            export COSIGN_PRIVATE_KEY="${{ secrets.SIGNING_SECRET }}"
+            
+            # 执行构建（直接推送到 GHCR，镜像缓存直接留在本地存储中）
+            bluebuild build ./config/${{ matrix.recipe }}
+
+            # 给本地刚刚构建完的镜像打上阿里云 ACR 的 tag，并直接推送到阿里云
+            echo "Tagging and pushing directly to Aliyun ACR (Zero download)..."
+            podman tag ghcr.io/edwardwoodhub/my-lxqt-cloud:latest ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+            podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+          fi
+
 # ==========================================
-  # Job 2：【新增】将上面构建好的容器镜像转换为 qcow2 镜像并作为 Artifacts 供下载
+  # Job 2：【保持原样】将上面构建好的容器镜像转换为 qcow2 镜像并作为 Artifacts 供下载
   # ==========================================
   build-disk:
     name: Build QCOW2 Disk Image
     runs-on: ubuntu-latest
     needs: bluebuild # 必须要等 Job 1（容器构建）成功后才会执行此步骤
     permissions:
-      contents: write  # 👈 这一行非常关键！没有它，Release 步骤会报 403 权限拒绝
-    # 仅在 main 默认分支上推送或手动触发时才生成磁盘镜像，避免 PR 时浪费 Actions 额度
+      contents: write
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
 
     steps:
-      # 1. 释放 GitHub Runner 的磁盘空间，防止编译虚拟机镜像时爆磁盘
+      # 1. 释放 GitHub Runner 的磁盘空间
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
         with:
@@ -103,7 +95,7 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      # 1. 登录 GHCR 以获得拉取私有/公开自定义镜像的权限
+      # 3. 登录 GHCR
       - name: Log in to GHCR
         uses: redhat-actions/podman-login@v1
         with:
@@ -111,16 +103,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. 提前拉取你刚刚构建好的最新系统镜像到本地
+      # 4. 提前拉取镜像
       - name: Pull Custom Image to Local
         run: |
           sudo podman pull ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
 
-      # 3. 使用 bootc-image-builder 将刚才打包好的 GHCR 镜像转换为 qcow2 格式
+      # 5. 使用 bootc-image-builder 转换 qcow2
       - name: Build QCOW2
-        # 我们使用红帽官方推荐的 bootc 镜像构建工具（容器版运行）
         run: |
-          # 【新增：安装 qemu-img 工具包】
           echo "正在安装 qemu-utils..."
           sudo apt-get update && sudo apt-get install -y qemu-utils
           
@@ -135,38 +125,18 @@ jobs:
             --type qcow2 \
             --rootfs ext4 \
             ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
-          # 💡 注意：请将上面最后一行的 "your-image-name" 替换为你在 recipe.yml 或 GitHub 中实际生成的容器镜像名称。
-          # ================== 【这里是新增的压缩核心逻辑】 ==================
+
           echo "检测到生成了 disk.qcow2，开始进行 QEMU 极限块压缩..."
-          
-          # 1. 使用 -c 参数进行压缩转换，输出到临时文件 compressed.qcow2
           sudo qemu-img convert -c -O qcow2 ./output/qcow2/disk.qcow2 ./output/qcow2/compressed.qcow2
-          
-          # 2. 用压缩后的小文件覆盖原有的巨无霸文件
           sudo mv ./output/qcow2/compressed.qcow2 ./output/qcow2/disk.qcow2
           
           echo "压缩完成！最终文件大小为："
           ls -lh ./output/qcow2/disk.qcow2
-          # ================================================================
 
-      # 4. 将生成的 qcow2 文件上传到 GitHub 运行结果的 Artifacts 中
+      # 6. 上传 Artifact
       - name: Upload QCOW2 as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: my-lxqt-qcow2
           path: ./output/qcow2/disk.qcow2
           if-no-files-found: error
-
-      # 【新增：发布到 Release 环节】
-      #- name: Release QCOW2 Image
-        #uses: softprops/action-gh-release@v2
-        #with:
-          #tag_name: latest-qcow2      # 固定的 Tag 名字，方便以后每次覆盖更新
-          #name: "Latest Custom Bluefin QCOW2 Image"
-          #body: "This is the latest compiled QCOW2 image of your custom Bluefin system."
-          # 指向你本地刚刚生成的裸 qcow2 文件路径
-          #files: ./output/qcow2/disk.qcow2 
-          #prerelease: false
-          #make_latest: true
-        #env:
-          #GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 必须配这个，Action 才有权帮你创建 Release
