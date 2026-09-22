@@ -32,9 +32,16 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      # 1. 释放空间（原先在 bluebuild Action 内部，现在提到最前面）
+      # 1. 释放空间（使用稳定通用的瘦身 Action，避免磁盘被吃满）
       - name: Maximize Build Space
-        uses: ublue-os/remove-unneeded-software@v0.1
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          
+      
 
       # 2. 一次性登录 GHCR 和 阿里云 ACR（凭据写入同一个 Podman/Docker 认证池）
       - name: Log in to Registries (GHCR & Aliyun ACR)
