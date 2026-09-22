@@ -50,24 +50,27 @@ jobs:
           podman login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
           podman login ${{ secrets.ALIYUN_ACR_REGISTRY }} -u ${{ secrets.ALIYUN_ACR_USERNAME }} -p ${{ secrets.ALIYUN_ACR_PASSWORD }}
 
-      # 3. 使用官方容器镜像执行构建（自动写入宿主机 Podman 存储池）
+      # 3. 使用官方容器镜像执行构建（显式连接 Podman socket）
       - name: Build and Push Locally
         run: |
-          # 仅在非 main 分支/PR 时只构建不推送
+          # 启动宿主机的 podman socket 服务
+          sudo systemctl start podman.socket
+
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "Running PR build (no push)..."
             sudo podman run --rm --privileged \
+              -v /run/podman/podman.sock:/var/run/docker.sock \
               -v /var/lib/containers/storage:/var/lib/containers/storage \
               -v ${{ github.workspace }}:/workspace \
               -w /workspace \
               --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
-              build recipes/${{ matrix.recipe }}
+              build --builder podman recipes/${{ matrix.recipe }}
           else
             echo "Building image and pushing directly to GHCR and Aliyun ACR..."
             
-            # 使用官方容器构建并推送到 GHCR，镜像层直接落地在宿主机存储
             sudo podman run --rm --privileged \
+              -v /run/podman/podman.sock:/var/run/docker.sock \
               -v /var/lib/containers/storage:/var/lib/containers/storage \
               -v ${{ github.workspace }}:/workspace \
               -v /run/user/1001/containers/auth.json:/root/.config/containers/auth.json:ro \
@@ -75,15 +78,15 @@ jobs:
               -w /workspace \
               --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
-              build recipes/${{ matrix.recipe }}
+              build --builder podman recipes/${{ matrix.recipe }}
 
-            # 直接从本地 Podman 存储打 Tag 并推往阿里云 ACR（完全不产生 GHCR 下载流量）
+            # 直接从本地 Podman 存储打 Tag 并推往阿里云 ACR
             echo "Tagging and pushing directly to Aliyun ACR (Zero download)..."
             sudo podman tag ghcr.io/edwardwoodhub/my-lxqt-cloud:latest ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
             sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
           fi
           
-        
+      
       
 
 # ==========================================
