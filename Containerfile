@@ -1,8 +1,7 @@
+# 切回 uBlue 基础底座
 FROM ghcr.io/ublue-os/base-main:44
 
-# ============================================================
-# 1. 系统包安装 (使用 DNF5 代替 rpm-ostree，速度更快且无沙箱挂载错误)
-# ============================================================
+# 1. 使用 dnf5 安装桌面环境及所需软件包
 RUN dnf5 -y install --setopt=install_weak_deps=False \
     adwaita-cursor-theme \
     adwaita-icon-theme \
@@ -59,26 +58,22 @@ RUN dnf5 -y install --setopt=install_weak_deps=False \
     xorg-x11-server-Xwayland \
     && dnf5 clean all
 
-# ============================================================
-# 2. 预置 Flatpak 列表 (对齐 uBlue 标准 flatpak 注入格式)
-# ============================================================
+# 2. 预置系统 Flatpak 列表 (使用安全单层 printf 写入)
 RUN mkdir -p /etc/flatpak/system-flatpaks.d && \
-    cat << 'EOF' > /etc/flatpak/system-flatpaks.d/custom-flatpaks.list
-com.google.Chrome
-com.visualstudio.code
-com.dropbox.Client
-com.github.tchx84.Flatseal
-org.mozilla.firefox
-io.missioncenter.MissionCenter
-com.jianguoyun.Nutstore
-io.github.peazip.PeaZip
-net.nokyan.Resources
-com.xnview.XnViewMP
-EOF
+    printf "%s\n" \
+      "com.google.Chrome" \
+      "com.visualstudio.code" \
+      "com.dropbox.Client" \
+      "com.github.tchx84.Flatseal" \
+      "org.mozilla.firefox" \
+      "io.missioncenter.MissionCenter" \
+      "com.jianguoyun.Nutstore" \
+      "io.github.peazip.PeaZip" \
+      "net.nokyan.Resources" \
+      "com.xnview.XnViewMP" \
+      > /etc/flatpak/system-flatpaks.d/custom-flatpaks.list
 
-# ============================================================
-# 3. 环境变量、用户 Linger 与防火墙规则
-# ============================================================
+# 3. 环境变量、用户 Linger 与防火墙放行
 RUN echo "WLR_NO_HARDWARE_CURSORS=1" >> /etc/environment && \
     echo "XDG_CURRENT_DESKTOP=LXQt:labwc:wlroots" >> /etc/environment && \
     echo "XDG_SESSION_TYPE=wayland" >> /etc/environment && \
@@ -87,51 +82,45 @@ RUN echo "WLR_NO_HARDWARE_CURSORS=1" >> /etc/environment && \
     touch /var/lib/systemd/linger/bob && \
     firewall-offline-cmd --add-port=5900/tcp
 
-# ============================================================
-# 4. Systemd 服务单元文件注入 (系统级与用户级)
-# ============================================================
+# 4. 注入 Systemd 服务单元
 # 4.1 系统级连接数限制服务
-RUN cat << 'EOF' > /etc/systemd/system/vnc-limit.service
-[Unit]
-Description=Limit VNC concurrent connections
-After=firewalld.service network.target
+RUN printf "%s\n" \
+    "[Unit]" \
+    "Description=Limit VNC concurrent connections" \
+    "After=firewalld.service network.target" \
+    "" \
+    "[Service]" \
+    "Type=oneshot" \
+    "ExecStart=/usr/sbin/iptables -I INPUT -p tcp --dport 5900 -m connlimit --connlimit-above 1 -j REJECT" \
+    "RemainAfterExit=yes" \
+    "" \
+    "[Install]" \
+    "WantedBy=multi-user.target" \
+    > /etc/systemd/system/vnc-limit.service
 
-[Service]
-Type=oneshot
-ExecStart=/usr/sbin/iptables -I INPUT -p tcp --dport 5900 -m connlimit --connlimit-above 1 -j REJECT
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 4.2 用户级 WayVNC 服务
+# 4.2 用户级 WayVNC 自动拉起服务
 RUN mkdir -p /usr/lib/systemd/user && \
-    cat << 'EOF' > /usr/lib/systemd/user/wayvnc.service
-[Unit]
-Description=WayVNC Service
-After=wayland-session.target
+    printf "%s\n" \
+    "[Unit]" \
+    "Description=WayVNC Service" \
+    "After=wayland-session.target" \
+    "" \
+    "[Service]" \
+    "Type=simple" \
+    "Environment=WAYLAND_DISPLAY=wayland-0" \
+    "Environment=XDG_RUNTIME_DIR=%t" \
+    "ExecStartPre=/usr/bin/systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR" \
+    "ExecStart=/usr/bin/wayvnc --render-cursor 0.0.0.0 5900" \
+    "Restart=always" \
+    "RestartSec=10" \
+    "" \
+    "[Install]" \
+    "WantedBy=default.target" \
+    > /usr/lib/systemd/user/wayvnc.service
 
-[Service]
-Type=simple
-Environment=WAYLAND_DISPLAY=wayland-0
-Environment=XDG_RUNTIME_DIR=%t
-ExecStartPre=/usr/bin/systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR
-ExecStart=/usr/bin/wayvnc --render-cursor 0.0.0.0 5900
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=default.target
-EOF
-
-# ============================================================
-# 5. 启用系统与用户服务
-# ============================================================
+# 5. 启用系统级与用户级服务
 RUN systemctl enable sddm.service firewalld.service vnc-limit.service && \
     systemctl --global enable wayvnc.service
 
-# ============================================================
-# 6. bootc/ostree 容器元数据声明
-# ============================================================
+# 6. bootc 容器标识
 LABEL "containers.bootc"="1"
