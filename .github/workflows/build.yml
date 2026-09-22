@@ -62,7 +62,7 @@ jobs:
               -w /workspace \
               --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
-              build ./config/${{ matrix.recipe }}
+              build recipes/${{ matrix.recipe }}
           else
             echo "Building image and pushing directly to GHCR and Aliyun ACR..."
             
@@ -75,17 +75,15 @@ jobs:
               -w /workspace \
               --entrypoint bluebuild \
               ghcr.io/blue-build/cli:latest \
-              build ./config/${{ matrix.recipe }}
+              build recipes/${{ matrix.recipe }}
 
             # 直接从本地 Podman 存储打 Tag 并推往阿里云 ACR（完全不产生 GHCR 下载流量）
             echo "Tagging and pushing directly to Aliyun ACR (Zero download)..."
             sudo podman tag ghcr.io/edwardwoodhub/my-lxqt-cloud:latest ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
             sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
           fi
-
           
-      
-          
+        
       
 
 # ==========================================
