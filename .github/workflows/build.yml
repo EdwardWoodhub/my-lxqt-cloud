@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-image:
-    name: Build Custom Bootc Image
+  build-pipeline:
+    name: Build System, LiveISO, QCOW2 & Push Registries
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,16 +34,16 @@ jobs:
           dotnet: true
           haskell: true
 
-      # 2. 登录 GHCR 和 阿里云 ACR
+      # 2. 登录 GHCR 和 阿里云 ACR（为最后的推送做准备）
       - name: Log in to Registries (GHCR & Aliyun ACR)
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         run: |
           echo "Logging in to GHCR..."
           echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u ${{ github.actor }} --password-stdin
           echo "Logging in to Aliyun ACR..."
-          echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | sudo podman login ${{ secrets.ALIYUN_ACR_REGISTRY }} -u ${{ secrets.ALIYUN_ACR_USERNAME }} --password-stdin
+          echo "${{ secrets.ALIYUN_ACR_PASSWORD }}" | sudo podman login ${{ secrets.ALIYUN_ACR_REGISTRY }} -u${{ secrets.ALIYUN_ACR_USERNAME }} --password-stdin
 
-      # 3. 在宿主机原生构建系统镜像（无嵌套容器，无套娃挂载）
+      # 3. 本地原生构建系统容器镜像
       - name: Build System Image
         run: |
           echo "Starting native Podman build..."
@@ -54,75 +54,40 @@ jobs:
             -f Containerfile .
 
       # ==========================================
-  # Job 3：将构建好的镜像打包为可安装的 LiveISO 并发布到 Release
-  # ==========================================
-  build-iso:
-    name: Build & Publish LiveISO
-    runs-on: ubuntu-latest
-    needs: build-image
-    permissions:
-      contents: write
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: redhat-actions/podman-login@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull Custom Image to Local
+      # 阶段 1：先构建 LiveISO 并发布到 GitHub Releases
+      # ==========================================
+      - name: Build LiveISO using bootc-image-builder
         run: |
-          sudo podman pull ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
-
-      - name: Build ISO using bootc-image-builder
-        run: |
-          mkdir -p ./output
+          mkdir -p ./output/iso
           sudo podman run \
             --rm \
             --privileged \
             --security-opt label=disable \
-            -v ./output:/output \
+            -v ./output/iso:/output \
             -v /var/lib/containers/storage:/var/lib/containers/storage \
             quay.io/centos-bootc/bootc-image-builder:latest \
             --type iso \
             --rootfs ext4 \
             ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
 
-          # 修复输出文件的权限，使其对当前 runner 用户可读写
-          sudo chown -R $(id -u):$(id -g) ./output
+          # 修复输出权限，避免 runner 用户无写权限报错
+          sudo chown -R $(id -u):$(id -g) ./output/iso
 
-          # 查找生成的 install.iso 并移动到工作目录根路径
-          ISO_FILE=$(find ./output -type f -name "*.iso" | head -n 1)
+          ISO_FILE=$(find ./output/iso -type f -name "*.iso" | head -n 1)
           if [ -z "$ISO_FILE" ]; then
             echo "Error: 未找到生成的 ISO 文件！"
             exit 1
           fi
           mv "$ISO_FILE" ./my-lxqt-cloud.iso
           ls -lh ./my-lxqt-cloud.iso
-      
-      
 
-      # 将大于 2GB 的 ISO 拆分为 1.5GB 的分卷，避免超出 GitHub 单文件上传限制
       - name: Split ISO
         run: |
           split -b 1500M my-lxqt-cloud.iso my-lxqt-cloud.iso.part-
           ls -lh my-lxqt-cloud.iso.part-*
 
-      # 发布到 GitHub Releases（自动生成基于当前日期的 Release Tag）
-      - name: Publish ISO to GitHub Releases
+      - name: Publish LiveISO to GitHub Releases
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         uses: softprops/action-gh-release@v2
         with:
           files: my-lxqt-cloud.iso.part-*
@@ -140,78 +105,62 @@ jobs:
               Get-Content my-lxqt-cloud.iso.part-* -ReadCount 0 -Encoding Byte | Set-Content my-lxqt-cloud.iso -Encoding Byte
               ```
           generate_release_notes: true
-      
-      # 4. 推送镜像至两个 Registry（仅在 main 分支推送）
-      - name: Push Images
-        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+
+      # 清理 ISO 文件以释放磁盘空间，避免后续构建 qcow2 时磁盘溢出
+      - name: Clean ISO Files
         run: |
-          echo "Pushing to GHCR..."
-          sudo podman push ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
-          
-          echo "Pushing directly to Aliyun ACR..."
-          sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+          rm -rf ./output/iso ./my-lxqt-cloud.iso ./my-lxqt-cloud.iso.part-*
 
-  # ==========================================
-  # Job 2：将构建好的镜像转换为 qcow2 磁盘镜像并上传 Artifacts
-  # ==========================================
-  build-disk:
-    name: Build QCOW2 Disk Image
-    runs-on: ubuntu-latest
-    needs: build-image
-    permissions:
-      contents: write
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: redhat-actions/podman-login@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull Custom Image to Local
-        run: |
-          sudo podman pull ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
-
-      - name: Build QCOW2
+      # ==========================================
+      # 阶段 2：然后生成 QCOW2 磁盘镜像并上传 Artifacts
+      # ==========================================
+      - name: Build QCOW2 Disk Image
         run: |
           echo "正在安装 qemu-utils..."
           sudo apt-get update && sudo apt-get install -y qemu-utils
           
-          mkdir -p ./output
+          mkdir -p ./output/qcow2
           sudo podman run \
             --rm \
             --privileged \
             --security-opt label=disable \
-            -v ./output:/output \
+            -v ./output/qcow2:/output \
             -v /var/lib/containers/storage:/var/lib/containers/storage \
             quay.io/centos-bootc/bootc-image-builder:latest \
             --type qcow2 \
             --rootfs ext4 \
             ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
 
+          # 修复输出权限
+          sudo chown -R $(id -u):$(id -g) ./output/qcow2
+
           echo "检测到生成了 disk.qcow2，开始进行 QEMU 极限块压缩..."
-          sudo qemu-img convert -c -O qcow2 ./output/qcow2/disk.qcow2 ./output/qcow2/compressed.qcow2
-          sudo mv ./output/qcow2/compressed.qcow2 ./output/qcow2/disk.qcow2
+          sudo qemu-img convert -c -O qcow2 ./output/qcow2/qcow2/disk.qcow2 ./output/qcow2/qcow2/compressed.qcow2
+          sudo mv ./output/qcow2/qcow2/compressed.qcow2 ./output/qcow2/qcow2/disk.qcow2
           
           echo "压缩完成！最终文件大小为："
-          ls -lh ./output/qcow2/disk.qcow2
+          ls -lh ./output/qcow2/qcow2/disk.qcow2
 
       - name: Upload QCOW2 as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: my-lxqt-qcow2
-          path: ./output/qcow2/disk.qcow2
+          path: ./output/qcow2/qcow2/disk.qcow2
           if-no-files-found: error
+
+      # 清理 QCOW2 文件释放磁盘
+      - name: Clean QCOW2 Files
+        run: |
+          rm -rf ./output/qcow2
+
+      # ==========================================
+      # 阶段 3：最后把 Blob 推送到 GHCR 和 阿里云 ACR
+      # ==========================================
+      - name: Push Images to Registries (GHCR & ACR)
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          echo "Pushing directly to Aliyun ACR..."
+          sudo podman push ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest
+
+          echo "Pushing to GHCR..."
+          sudo podman push ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
