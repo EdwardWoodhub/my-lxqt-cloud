@@ -99,6 +99,7 @@ jobs:
             -v /var/lib/containers/storage:/var/lib/containers/storage \
             quay.io/centos-bootc/bootc-image-builder:latest \
             --type iso \
+            --rootfs ext4 \
             ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
 
           # 查找生成的 iso 文件并重命名为统一文件名
