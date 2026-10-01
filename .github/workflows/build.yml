@@ -90,7 +90,6 @@ jobs:
       - name: Build ISO using bootc-image-builder
         run: |
           mkdir -p ./output
-          # bootc-image-builder 支持通过 --type iso 生成可引导安装的 ISO 镜像
           sudo podman run \
             --rm \
             --privileged \
@@ -102,7 +101,10 @@ jobs:
             --rootfs ext4 \
             ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
 
-          # 查找生成的 iso 文件并重命名为统一文件名
+          # 修复输出文件的权限，使其对当前 runner 用户可读写
+          sudo chown -R $(id -u):$(id -g) ./output
+
+          # 查找生成的 install.iso 并移动到工作目录根路径
           ISO_FILE=$(find ./output -type f -name "*.iso" | head -n 1)
           if [ -z "$ISO_FILE" ]; then
             echo "Error: 未找到生成的 ISO 文件！"
@@ -110,6 +112,8 @@ jobs:
           fi
           mv "$ISO_FILE" ./my-lxqt-cloud.iso
           ls -lh ./my-lxqt-cloud.iso
+      
+      
 
       # 将大于 2GB 的 ISO 拆分为 1.5GB 的分卷，避免超出 GitHub 单文件上传限制
       - name: Split ISO
