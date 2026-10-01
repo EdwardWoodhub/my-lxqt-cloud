@@ -20,6 +20,7 @@ RUN dnf5 -y install --setopt=install_weak_deps=False \
     grim \
     hicolor-icon-theme \
     htop \
+    konsole \
     labwc \
     lximage-qt \
     lxqt-themes \
