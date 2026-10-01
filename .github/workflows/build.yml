@@ -17,7 +17,7 @@ jobs:
     name: Build Custom Bootc Image
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
 
@@ -53,6 +53,89 @@ jobs:
             -t ${{ secrets.ALIYUN_ACR_REGISTRY }}/edwardwoodhub/my-lxqt-cloud:latest \
             -f Containerfile .
 
+      # ==========================================
+  # Job 3：将构建好的镜像打包为可安装的 LiveISO 并发布到 Release
+  # ==========================================
+  build-iso:
+    name: Build & Publish LiveISO
+    runs-on: ubuntu-latest
+    needs: build-image
+    permissions:
+      contents: write
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull Custom Image to Local
+        run: |
+          sudo podman pull ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
+
+      - name: Build ISO using bootc-image-builder
+        run: |
+          mkdir -p ./output
+          # bootc-image-builder 支持通过 --type iso 生成可引导安装的 ISO 镜像
+          sudo podman run \
+            --rm \
+            --privileged \
+            --security-opt label=disable \
+            -v ./output:/output \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type iso \
+            ghcr.io/edwardwoodhub/my-lxqt-cloud:latest
+
+          # 查找生成的 iso 文件并重命名为统一文件名
+          ISO_FILE=$(find ./output -type f -name "*.iso" | head -n 1)
+          if [ -z "$ISO_FILE" ]; then
+            echo "Error: 未找到生成的 ISO 文件！"
+            exit 1
+          fi
+          mv "$ISO_FILE" ./my-lxqt-cloud.iso
+          ls -lh ./my-lxqt-cloud.iso
+
+      # 将大于 2GB 的 ISO 拆分为 1.5GB 的分卷，避免超出 GitHub 单文件上传限制
+      - name: Split ISO
+        run: |
+          split -b 1500M my-lxqt-cloud.iso my-lxqt-cloud.iso.part-
+          ls -lh my-lxqt-cloud.iso.part-*
+
+      # 发布到 GitHub Releases（自动生成基于当前日期的 Release Tag）
+      - name: Publish ISO to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: my-lxqt-cloud.iso.part-*
+          tag_name: release-${{ github.run_number }}
+          name: "LXQt Cloud LiveISO Build #${{ github.run_number }}"
+          body: |
+            ### LXQt Cloud LiveISO 发布
+            - 镜像版本: `latest`
+            - 合并分卷命令（Linux/macOS）:
+              ```bash
+              cat my-lxqt-cloud.iso.part-* > my-lxqt-cloud.iso
+              ```
+            - 合并分卷命令（Windows PowerShell）:
+              ```powershell
+              Get-Content my-lxqt-cloud.iso.part-* -ReadCount 0 -Encoding Byte | Set-Content my-lxqt-cloud.iso -Encoding Byte
+              ```
+          generate_release_notes: true
+      
       # 4. 推送镜像至两个 Registry（仅在 main 分支推送）
       - name: Push Images
         if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
