@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-pipeline:
     name: Build System, LiveISO, QCOW2 & Push Registries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       packages: write
