@@ -42,6 +42,7 @@ RUN dnf5 -y install --setopt=install_weak_deps=False \
     polkit \
     pcmanfm-qt \
     pluma \
+    python3 \
     qterminal \
     screengrab \
     sddm \
@@ -50,6 +51,7 @@ RUN dnf5 -y install --setopt=install_weak_deps=False \
     thunar \
     thunar-archive-plugin \
     tilix \
+    uv \
     wayvnc \
     xdg-desktop-portal-gtk \
     xdg-desktop-portal-wlr \
