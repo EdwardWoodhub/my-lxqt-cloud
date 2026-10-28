@@ -1,4 +1,4 @@
-# 切回 uBlue 基础底座
+# 切回 fedora 基础底座
 FROM quay.io/fedora/fedora-bootc:44
 
 # 1. 使用 dnf5 安装桌面环境及所需软件包
@@ -20,6 +20,7 @@ RUN dnf5 -y install --setopt=install_weak_deps=False \
     grim \
     hicolor-icon-theme \
     htop \
+    kate \
     konsole \
     labwc \
     lximage-qt \
